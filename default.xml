@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  vela 통합 빌드 manifest (repo manifest 형식)
+
+  로컬에서 같은 트리를 받으려면: repo init -u <이 레포 URL> -m default.xml && repo sync
+  CI 는 repo 도구를 쓰지 않고 scripts/resolve.sh 가 이 파일을 읽어 SHA 를 확정한다.
+
+  1단계 범위: q-vela README "Launch" 절의 부팅 구성
+    q-vela(QEMU) + vela-fws(fw_dynamic.bin) + vela-linux(Image) + vela(Ubuntu 이미지)
+  revision 은 각 레포의 기본 브랜치다 (vela 만 ubuntu).
+-->
+<manifest>
+  <remote name="vela" fetch="https://github.com/riscv-vela/" />
+  <default remote="vela" revision="main" />
+
+  <project name="q-vela"     path="q-vela" />
+  <project name="vela-fws"   path="vela-fws" />
+  <project name="vela-linux" path="vela-linux" />
+  <project name="vela"       path="vela" revision="ubuntu" />
+</manifest>
