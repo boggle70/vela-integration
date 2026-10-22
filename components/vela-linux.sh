@@ -17,7 +17,8 @@ build() {
 
   # driver Makefile 은 CROSS_COMPILE=riscv64-linux-gnu- 를 고정해 쓴다 (README). 커널과 접두사를 맞춘다.
   [ "$CROSS_COMPILE" = riscv64-linux-gnu- ] || die "keystone driver 는 riscv64-linux-gnu- 만 지원"
-  make -C "$src/linux-keystone-driver"
+  # driver Makefile 은 M=$(PWD) 를 쓴다. make -C 는 환경변수 PWD 를 바꾸지 않으므로 README 처럼 cd 후 make 한다.
+  (cd "$src/linux-keystone-driver" && make)
 
   cp "$src/linux/arch/riscv/boot/Image" "$src/linux-keystone-driver/keystone-driver.ko" "$out/"
 }

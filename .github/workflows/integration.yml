@@ -118,7 +118,7 @@ jobs:
           # shellcheck disable=SC2046 # 공백 구분 목록을 인자로 나눈다
           sudo apt-get install -y --no-install-recommends $(components/"$C".sh deps)
           scripts/fetch.sh lock.xml "$C" "src/$C"
-          components/"$C".sh build "src/$C" "out/$C"
+          scripts/run-logged.sh "build $C" "build-$C.log" components/"$C".sh build "src/$C" "out/$C"
 
       - if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
@@ -171,7 +171,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends $(components/q-vela.sh deps)
 
       - name: 부팅 시험
-        run: compose/boot-test.sh out | tee -a "$GITHUB_STEP_SUMMARY"
+        run: |
+          scripts/run-logged.sh boot-test boot-test.log compose/boot-test.sh out
+          tail -n 1 boot-test.log >> "$GITHUB_STEP_SUMMARY"
 
       - if: always()
         uses: actions/upload-artifact@v7
