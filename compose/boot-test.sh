@@ -42,8 +42,11 @@ done
 pid=$!
 trap 'kill "$pid" 2>/dev/null || true' EXIT
 
+# getty prompt "<hostname> login:" 만 인정한다. serial 출력은 CR 이 섞여 있어 지우고 본다.
+prompt() { tr -d '\r' <"$log" | grep -nE '^[[:alnum:]._-]+ login: ?$'; }
+
 start=$SECONDS
-while ! grep -q 'login:' "$log"; do
+while ! prompt >/dev/null; do
   if ! kill -0 "$pid" 2>/dev/null; then
     echo "error: QEMU 가 login prompt 전에 종료됐다" >&2
     tail -50 "$log" >&2
@@ -56,4 +59,4 @@ while ! grep -q 'login:' "$log"; do
   fi
   sleep 10
 done
-echo "boot ok: login prompt 까지 $((SECONDS - start))s"
+echo "boot ok: login prompt 까지 $((SECONDS - start))s, boot.log $(wc -l <"$log") 줄, prompt: $(prompt | head -1)"

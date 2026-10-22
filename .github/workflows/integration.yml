@@ -175,6 +175,15 @@ jobs:
           scripts/run-logged.sh boot-test boot-test.log compose/boot-test.sh out
           tail -n 1 boot-test.log >> "$GITHUB_STEP_SUMMARY"
 
+      # 성공해도 serial 출력 끝부분을 notice annotation 으로 남긴다 (로그·artifact 는 권한이 있어야 받을 수 있다)
+      - name: 부팅 로그 요약
+        if: always()
+        run: |
+          [ -f out/boot.log ] || exit 0
+          msg=$(tr -d '\r' < out/boot.log | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | tail -n 40 \
+            | sed -e 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::notice title=boot.log 마지막 40줄 ($(wc -l < out/boot.log) 줄 중)::$msg"
+
       - if: always()
         uses: actions/upload-artifact@v7
         with:
