@@ -13,7 +13,7 @@ riscv-vela 레포들을 묶어 하나의 통합 빌드·부팅 확인을 수행�
 | vela-linux | `Image`, `keystone-driver.ko` | vela-linux README "Building" |
 | vela | `ubuntu-noble-riscv64.qcow2` | vela README, `init.sh` |
 
-통과 기준: 위 네 산출물로 부팅해 serial 에 `login:` 이 나온다.
+통과 기준: 위 네 산출물로 부팅해 serial 에 getty prompt `<hostname> login:` 이 나온다.
 
 1단계에서 제외한 것
 
@@ -57,9 +57,18 @@ compose/boot-test.sh out
 
 repo 도구로 트리를 받으려면: `repo init -u <이 레포 URL> -m default.xml && repo sync`
 
-## 확인되지 않은 것
+## 실행으로 확인한 것
 
-- apt 교차 컴파일러(`riscv64-linux-gnu-`)로 OpenSBI + Security Monitor 링크 성공 여부
+GitHub Actions run [39816688832](https://github.com/boggle70/vela-integration/actions/runs/39816688832),
+[39819321537](https://github.com/boggle70/vela-integration/actions/runs/39819321537),
+[39822455084](https://github.com/boggle70/vela-integration/actions/runs/39822455084) 기준.
+
+| 항목 | 결과 | 빌드·시험 step 소요 |
+|---|---|---|
+| apt 교차 컴파일러(`riscv64-linux-gnu-`)로 OpenSBI + Security Monitor 링크 | 성공 (vela-fws) | 43초 |
+| GitHub runner 에서 `init.sh` (losetup, qemu-user chroot) | 성공 (vela) | 9분 22초 |
+| TCG 부팅, getty login prompt 까지 | 성공 (boot-test) | 20~30초 (`BOOT_TIMEOUT` 기본 3600초) |
+
+## 남은 위험
+
 - `vela-fws/sm/rust-toolchain.toml` 이 `channel = "nightly"` 로 날짜를 고정하지 않아 실행일에 따라 결과가 달라질 수 있다
-- GitHub runner 에서 `init.sh` (losetup, qemu-user chroot) 동작 여부
-- TCG 부팅 소요 시간 (`BOOT_TIMEOUT` 기본 3600초)
