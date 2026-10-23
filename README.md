@@ -48,7 +48,7 @@ compose/boot-test.sh        부팅 시험
 
 ## 실행
 
-GitHub Actions: 매일 02:00 KST, 또는 Actions 탭 → integration → Run workflow (`force` 로 성공 이력 무시).
+GitHub Actions: 매주 월요일 02:00 KST, 또는 Actions 탭 → integration → Run workflow (`force` 로 성공 이력 무시).
 레포 SHA 와 스크립트가 직전 성공 때와 같으면 빌드를 건너뛴다.
 
 로컬 (Ubuntu 24.04 x64, sudo 필요):

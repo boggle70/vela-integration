@@ -10,7 +10,7 @@
 #   public 레포에 어떻게 적용되는지 문서로 확인하지 못했다. cache 는 레포당 10 GB.
 #   근거: https://docs.github.com/en/actions/reference/limits
 #
-# 트리거: 매일 02:00 KST(cron 은 UTC), 수동 실행(force: 성공 이력 무시),
+# 트리거: 매주 월요일 02:00 KST(cron 은 UTC, 일요일 17:00), 수동 실행(force: 성공 이력 무시),
 #   ci/** 브랜치 push(워크플로 시험용. schedule·workflow_dispatch 는 기본 브랜치의 워크플로만 실행한다)
 # 이 워크플로는 PR 필수 체크가 아니다. pull_request 트리거를 두지 않는다.
 
@@ -18,7 +18,7 @@ name: integration
 
 on:
   schedule:
-    - cron: '0 17 * * *'
+    - cron: '0 17 * * 0'
   push:
     branches:
       - 'ci/**'
