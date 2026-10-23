@@ -1,0 +1,201 @@
+# integration.yml — vela 통합 빌드 1단계: q-vela README "Launch" 구성의 부팅 확인
+#
+# 흐름
+#   resolve   : default.xml 의 branch → SHA 확정(lock.xml). 같은 lock·스크립트 조합이 이미 성공했으면 이후 job 을 건너뛴다.
+#   build     : 컴포넌트별 빌드(matrix). 산출물은 cache key <component>-<SHA>-<스크립트 hash> 로 보관하고,
+#               같은 key 가 이미 있으면 빌드하지 않는다.
+#   boot-test : 네 산출물을 cache 에서 복원해 부팅, serial 에 login prompt 가 나오는지 확인한다.
+#
+# 산출물을 artifact 가 아니라 cache 로 넘긴다. 이미지가 수백 MB 이상이고, artifact 저장 한도가
+#   public 레포에 어떻게 적용되는지 문서로 확인하지 못했다. cache 는 레포당 10 GB.
+#   근거: https://docs.github.com/en/actions/reference/limits
+#
+# 트리거: 매일 02:00 KST(cron 은 UTC), 수동 실행(force: 성공 이력 무시),
+#   ci/** 브랜치 push(워크플로 시험용. schedule·workflow_dispatch 는 기본 브랜치의 워크플로만 실행한다)
+# 이 워크플로는 PR 필수 체크가 아니다. pull_request 트리거를 두지 않는다.
+
+name: integration
+
+on:
+  schedule:
+    - cron: '0 17 * * *'
+  push:
+    branches:
+      - 'ci/**'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: '같은 lock 의 성공 이력이 있어도 다시 실행'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+      ok-key: ${{ steps.key.outputs.ok-key }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: SHA 확정
+        run: |
+          scripts/resolve.sh default.xml lock.xml | tee resolved.txt
+          {
+            echo "## lock"
+            echo
+            echo "| 레포 | SHA | revision |"
+            echo "|---|---|---|"
+            while read -r name sha rev; do echo "| $name | \`$sha\` | $rev |"; done < resolved.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - id: key
+        run: echo "ok-key=lock-ok-${{ hashFiles('lock.xml', 'components/*.sh', 'compose/*.sh', '.github/workflows/integration.yml') }}" >> "$GITHUB_OUTPUT"
+
+      - id: ok
+        uses: actions/cache/restore@v6
+        with:
+          path: lock.xml
+          key: ${{ steps.key.outputs.ok-key }}
+          lookup-only: true
+
+      - id: decide
+        env:
+          HIT: ${{ steps.ok.outputs.cache-hit }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          if [ "$HIT" = true ] && [ "$FORCE" != true ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "같은 lock 이 이미 성공했다. 빌드를 건너뛴다." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: lock
+          path: lock.xml
+
+  build:
+    needs: resolve
+    if: needs.resolve.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [q-vela, vela-fws, vela-linux, vela]
+    env:
+      C: ${{ matrix.component }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: lock
+
+      - id: key
+        run: echo "key=$(scripts/cache-key.sh lock.xml "$C")" >> "$GITHUB_OUTPUT"
+
+      - id: cache
+        uses: actions/cache/restore@v6
+        with:
+          path: out/${{ matrix.component }}
+          key: ${{ steps.key.outputs.key }}
+          lookup-only: true
+
+      - name: 빌드
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          # shellcheck disable=SC2046 # 공백 구분 목록을 인자로 나눈다
+          sudo apt-get install -y --no-install-recommends $(components/"$C".sh deps)
+          scripts/fetch.sh lock.xml "$C" "src/$C"
+          scripts/run-logged.sh "build $C" "build-$C.log" components/"$C".sh build "src/$C" "out/$C"
+
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: out/${{ matrix.component }}
+          key: ${{ steps.key.outputs.key }}
+
+  boot-test:
+    needs: [resolve, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: lock
+
+      - id: key
+        run: |
+          for c in q-vela vela-fws vela-linux vela; do
+            echo "$c=$(scripts/cache-key.sh lock.xml "$c")"
+          done >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/q-vela
+          key: ${{ steps.key.outputs.q-vela }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/vela-fws
+          key: ${{ steps.key.outputs.vela-fws }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/vela-linux
+          key: ${{ steps.key.outputs.vela-linux }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/vela
+          key: ${{ steps.key.outputs.vela }}
+          fail-on-cache-miss: true
+
+      - name: QEMU 실행 라이브러리
+        run: |
+          sudo apt-get update
+          # shellcheck disable=SC2046 # 공백 구분 목록을 인자로 나눈다
+          sudo apt-get install -y --no-install-recommends $(components/q-vela.sh deps)
+
+      - name: 부팅 시험
+        run: |
+          scripts/run-logged.sh boot-test boot-test.log compose/boot-test.sh out
+          tail -n 1 boot-test.log >> "$GITHUB_STEP_SUMMARY"
+
+      # 성공해도 serial 출력 끝부분을 notice annotation 으로 남긴다 (로그·artifact 는 권한이 있어야 받을 수 있다)
+      - name: 부팅 로그 요약
+        if: always()
+        run: |
+          [ -f out/boot.log ] || exit 0
+          msg=$(tr -d '\r' < out/boot.log | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | tail -n 40 \
+            | sed -e 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::notice title=boot.log 마지막 40줄 ($(wc -l < out/boot.log) 줄 중)::$msg"
+
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: boot-log
+          path: |
+            out/boot.log
+            out/qemu.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: 성공 기록
+        uses: actions/cache/save@v6
+        with:
+          path: lock.xml
+          key: ${{ needs.resolve.outputs.ok-key }}
