@@ -5,6 +5,8 @@
 # shellcheck source=components/lib.sh
 source "$(dirname "$0")/lib.sh"
 
+RUST_NIGHTLY=${RUST_NIGHTLY:-nightly-2026-10-21}
+
 deps() {
   echo build-essential curl ca-certificates gcc-riscv64-linux-gnu
 }
@@ -18,6 +20,12 @@ build() {
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
   fi
   export PATH=$HOME/.cargo/bin:$PATH
+
+  # channel = "nightly" 는 날짜가 고정되지 않아 실행일에 따라 결과가 바뀐다.
+  # nightly 2026-10-22(7189d39d9)부터 libvela.a 링크에서 `bcmp` 미정의로 실패한다 (run 39907381493).
+  # 마지막 성공 버전(2026-10-21, run 39816688832)으로 고정한다. 레포 쪽 고정이 반영되면 제거한다.
+  sed -i "s/^channel = \"nightly\"$/channel = \"$RUST_NIGHTLY\"/" "$src/sm/rust-toolchain.toml"
+  grep -q "^channel = \"$RUST_NIGHTLY\"$" "$src/sm/rust-toolchain.toml" || die "sm/rust-toolchain.toml channel 고정 실패"
 
   (cd "$src/sm" && rustup toolchain install && cargo build)
 
