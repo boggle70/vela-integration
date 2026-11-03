@@ -1,0 +1,197 @@
+# integration.yml — vela integration build, stage 1: boot check of the q-vela README "Launch" configuration
+#
+# Flow
+#   resolve   : resolve default.xml branches → SHAs (lock.xml). If the same lock and scripts already passed, skip the later jobs.
+#   build     : build each component (matrix). Outputs are stored under the cache key <component>-<SHA>-<script hash>;
+#               if the key already exists, the component is not built.
+#   boot-test : restore the four outputs from the cache, boot, and check that a login prompt appears on serial.
+#
+# Outputs are passed through the cache, not artifacts. The images are hundreds of MB or more, and the documentation
+#   does not make clear how the artifact storage limit applies to public repositories. The cache allows 10 GB per repository.
+#   Source: https://docs.github.com/en/actions/reference/limits
+#
+# Trigger: manual run only (workflow_dispatch). No schedule, push or pull_request trigger, so a heavy build
+#   never starts without someone asking for it. force ignores the success record.
+#   A run can target a branch or tag: Actions tab → integration → Run workflow, or
+#   gh workflow run integration --ref <branch|tag>
+
+name: integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Run again even if the same lock already passed'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+      ok-key: ${{ steps.key.outputs.ok-key }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve SHAs
+        run: |
+          scripts/resolve.sh default.xml lock.xml | tee resolved.txt
+          {
+            echo "## lock"
+            echo
+            echo "| Repository | SHA | revision |"
+            echo "|---|---|---|"
+            while read -r name sha rev; do echo "| $name | \`$sha\` | $rev |"; done < resolved.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - id: key
+        run: echo "ok-key=lock-ok-${{ hashFiles('lock.xml', 'components/*.sh', 'compose/*.sh', '.github/workflows/integration.yml') }}" >> "$GITHUB_OUTPUT"
+
+      - id: ok
+        uses: actions/cache/restore@v6
+        with:
+          path: lock.xml
+          key: ${{ steps.key.outputs.ok-key }}
+          lookup-only: true
+
+      - id: decide
+        env:
+          HIT: ${{ steps.ok.outputs.cache-hit }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          if [ "$HIT" = true ] && [ "$FORCE" != true ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "The same lock already passed. Skipping the build." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: lock
+          path: lock.xml
+
+  build:
+    needs: resolve
+    if: needs.resolve.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [q-vela, vela-fws, vela-linux, vela]
+    env:
+      C: ${{ matrix.component }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: lock
+
+      - id: key
+        run: echo "key=$(scripts/cache-key.sh lock.xml "$C")" >> "$GITHUB_OUTPUT"
+
+      - id: cache
+        uses: actions/cache/restore@v6
+        with:
+          path: out/${{ matrix.component }}
+          key: ${{ steps.key.outputs.key }}
+          lookup-only: true
+
+      - name: Build
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          # shellcheck disable=SC2046 # split the space-separated list into arguments
+          sudo apt-get install -y --no-install-recommends $(components/"$C".sh deps)
+          scripts/fetch.sh lock.xml "$C" "src/$C"
+          scripts/run-logged.sh "build $C" "build-$C.log" components/"$C".sh build "src/$C" "out/$C"
+
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: out/${{ matrix.component }}
+          key: ${{ steps.key.outputs.key }}
+
+  boot-test:
+    needs: [resolve, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: lock
+
+      - id: key
+        run: |
+          for c in q-vela vela-fws vela-linux vela; do
+            echo "$c=$(scripts/cache-key.sh lock.xml "$c")"
+          done >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/q-vela
+          key: ${{ steps.key.outputs.q-vela }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/vela-fws
+          key: ${{ steps.key.outputs.vela-fws }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/vela-linux
+          key: ${{ steps.key.outputs.vela-linux }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/vela
+          key: ${{ steps.key.outputs.vela }}
+          fail-on-cache-miss: true
+
+      - name: QEMU runtime libraries
+        run: |
+          sudo apt-get update
+          # shellcheck disable=SC2046 # split the space-separated list into arguments
+          sudo apt-get install -y --no-install-recommends $(components/q-vela.sh deps)
+
+      - name: Boot test
+        run: |
+          scripts/run-logged.sh boot-test boot-test.log compose/boot-test.sh out
+          tail -n 1 boot-test.log >> "$GITHUB_STEP_SUMMARY"
+
+      # Post the end of the serial output as a notice annotation even on success (logs and artifacts require access to download)
+      - name: Boot log summary
+        if: always()
+        run: |
+          [ -f out/boot.log ] || exit 0
+          msg=$(tr -d '\r' < out/boot.log | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | tail -n 40 \
+            | sed -e 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::notice title=boot.log last 40 lines (of $(wc -l < out/boot.log))::$msg"
+
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: boot-log
+          path: |
+            out/boot.log
+            out/qemu.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Record success
+        uses: actions/cache/save@v6
+        with:
+          path: lock.xml
+          key: ${{ needs.resolve.outputs.ok-key }}

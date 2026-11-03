@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  vela integration build manifest (repo manifest format)
+
+  Each project is pinned to a commit (revision = SHA). upstream names the branch the commit is taken from.
+  The maintainer checks the upstream branches for changes, runs the integration build on a branch with the
+  new SHAs, and merges it by pull request once it passes, so main holds the last integrated configuration.
+
+  To fetch the same tree locally: repo init -u <this repository URL> -m default.xml && repo sync
+  CI does not use the repo tool; scripts/resolve.sh reads this file and writes lock.xml.
+
+  Stage 1 scope: the boot configuration in the "Launch" section of the q-vela README
+    q-vela (QEMU) + vela-fws (fw_dynamic.bin) + vela-linux (Image) + vela (Ubuntu image)
+-->
+<manifest>
+  <remote name="vela" fetch="https://github.com/riscv-vela/" />
+  <default remote="vela" revision="main" />
+
+  <project name="q-vela"     path="q-vela"     revision="60aaab1d1f124d88f6f9f7410d4777bf20bbe170" upstream="main" />
+  <project name="vela-fws"   path="vela-fws"   revision="7b4d09c929b550eb286f59624d9ddeb8917db9cf" upstream="main" />
+  <project name="vela-linux" path="vela-linux" revision="a0cd7f2d81c3d691eee5f03a0477fbaf1447f9e5" upstream="main" />
+  <project name="vela"       path="vela"       revision="62d4922671476e1eca39af9ffcadceae4cde3132" upstream="ubuntu" />
+</manifest>
