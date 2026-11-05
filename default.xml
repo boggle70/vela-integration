@@ -11,13 +11,24 @@
 
   Stage 1 scope: the boot configuration in the "Launch" section of the q-vela README
     q-vela (QEMU) + vela-fws (fw_dynamic.bin) + vela-linux (Image) + vela (Ubuntu image)
+
+  annotation owners: GitHub logins (space-separated) mentioned in the issue scripts/report.sh opens when the
+  repository's build fails. resolve and boot-test failures go to REPORT_OWNERS in integration.yml.
 -->
 <manifest>
   <remote name="vela" fetch="https://github.com/riscv-vela/" />
   <default remote="vela" revision="main" />
 
-  <project name="q-vela"     path="q-vela"     revision="60aaab1d1f124d88f6f9f7410d4777bf20bbe170" upstream="main" />
-  <project name="vela-fws"   path="vela-fws"   revision="7b4d09c929b550eb286f59624d9ddeb8917db9cf" upstream="main" />
-  <project name="vela-linux" path="vela-linux" revision="a0cd7f2d81c3d691eee5f03a0477fbaf1447f9e5" upstream="main" />
-  <project name="vela"       path="vela"       revision="62d4922671476e1eca39af9ffcadceae4cde3132" upstream="ubuntu" />
+  <project name="q-vela"     path="q-vela"     revision="60aaab1d1f124d88f6f9f7410d4777bf20bbe170" upstream="main">
+    <annotation name="owners" value="seonyoooung" />
+  </project>
+  <project name="vela-fws"   path="vela-fws"   revision="7b4d09c929b550eb286f59624d9ddeb8917db9cf" upstream="main">
+    <annotation name="owners" value="kanghayoung-76" />
+  </project>
+  <project name="vela-linux" path="vela-linux" revision="a0cd7f2d81c3d691eee5f03a0477fbaf1447f9e5" upstream="main">
+    <annotation name="owners" value="KimYoungho-ETRI" />
+  </project>
+  <project name="vela"       path="vela"       revision="62d4922671476e1eca39af9ffcadceae4cde3132" upstream="ubuntu">
+    <annotation name="owners" value="syahn0910" />
+  </project>
 </manifest>

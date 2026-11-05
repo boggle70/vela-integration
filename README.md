@@ -42,6 +42,7 @@ default.xml                 repo manifest (repositories and revisions)
 scripts/resolve.sh          resolve branch → SHA, write lock.xml
 scripts/fetch.sh            fetch one repository at the SHA in the lock (depth 1)
 scripts/cache-key.sh        output cache key: <repo>-<SHA>-<build script hash>
+scripts/report.sh           report failed jobs as issues that mention the owners
 components/<repo>.sh        deps: apt package list / build <src> <out>: build
 compose/boot-test.sh        boot test
 .github/workflows/integration.yml
@@ -56,6 +57,21 @@ GitHub Actions runs the integration build only on a manual request: Actions tab 
 or `gh workflow run integration --ref <branch|tag>` (`force` ignores the previous success record).
 
 If the repository SHAs and scripts are the same as in the last successful run, the build is skipped.
+
+### Failure reports
+
+After the other jobs, the `report` job opens an issue in this repository for each failed job and mentions its owners,
+so they get a GitHub notification (by email if they enabled it):
+
+| Failed job | Mentioned |
+|---|---|
+| `build (<repo>)` | the `owners` annotation of the repository in `default.xml` |
+| `resolve`, `boot-test` | `REPORT_OWNERS` in `integration.yml` |
+
+The issue is titled `integration: <job> failed` and carries the lock and the end of the failed step's log.
+If the issue is already open, a later failure adds a comment; when the job passes again, the issue is closed.
+Outside riscv-vela (e.g. in a fork) only the user who started the run is mentioned, and nothing is reported if the
+repository has issues disabled.
 
 ### Updating the configuration
 
