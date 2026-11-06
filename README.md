@@ -1,3 +1,8 @@
+<!--
+SPDX-License-Identifier: MIT
+SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
+-->
+
 # vela-integration
 
 Builds the riscv-vela repositories together and checks that the combined stack boots.

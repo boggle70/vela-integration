@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
+  SPDX-License-Identifier: MIT
+  SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
+-->
+<!--
   vela integration build manifest (repo manifest format)
 
   Each project is pinned to a commit (revision = SHA). upstream names the branch the commit is taken from.

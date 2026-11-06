@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
 # vela-fws — Security Monitor (Rust) + OpenSBI. Source: vela-fws/README.md "TEE — Building OpenSBI + Security Monitor"
 # Outputs: <out>/fw_dynamic.bin (-bios in q-vela Launch), <out>/fw_jump.bin (FW_BIN for vela-apps attestation)
 # Out of stage 1 scope: edk2, buildroot (RAS boot path)

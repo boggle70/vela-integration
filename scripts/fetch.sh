@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
 # fetch.sh — fetch one repository at the SHA pinned in the lock file (depth 1, without submodules).
 #
 # Usage: scripts/fetch.sh <lock.xml> <project> <dest>
