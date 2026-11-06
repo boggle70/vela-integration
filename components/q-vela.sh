@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
 # q-vela — QEMU (riscv64-softmmu). Source: q-vela/README.md "Build QEMU", "Verify the build"
 # Outputs: <out>/bin/qemu-system-riscv64, <out>/bin/qemu-img, <out>/share/qemu (make install)
 # shellcheck source=components/lib.sh

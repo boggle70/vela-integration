@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
 # vela-linux — kernel Image + Keystone driver. Source: vela-linux/README.md "Building"
 # Outputs: <out>/Image (-kernel in q-vela Launch), <out>/keystone-driver.ko
 # shellcheck source=components/lib.sh

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
 # report.sh — report the results of this run as issues in this repository, so the owners get a GitHub notification (email
 # if they enabled it).
 #

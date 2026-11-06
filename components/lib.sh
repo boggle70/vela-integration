@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
 # lib.sh — shared part of components/*.sh. Each script sources this file, defines deps() and build(), and calls main "$@".
 #
 # Usage: components/<name>.sh deps              # print the required apt packages

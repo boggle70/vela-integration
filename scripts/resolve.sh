@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
 # resolve.sh — resolve the manifest's branches/tags to commit SHAs and write a lock file.
 #
 # Usage : scripts/resolve.sh <manifest.xml> <lock.xml>

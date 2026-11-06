@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
 # boot-test.sh — boot the q-vela README "Launch" configuration and check that a login prompt appears on serial.
 #
 # Usage : compose/boot-test.sh <out>

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
 # integration.yml — vela integration build, stage 1: boot check of the q-vela README "Launch" configuration
 #
 # Flow

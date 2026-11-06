@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
 # vela — Ubuntu noble riscv64 image. Source: vela/README.md "Preparing ubuntu image", vela/init.sh
 # Output: <out>/ubuntu-noble-riscv64.qcow2
 #

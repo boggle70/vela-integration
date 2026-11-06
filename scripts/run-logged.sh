@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
 # run-logged.sh — run a command, save its output to a log file, and on failure post the end of the log as a GitHub annotation.
 # Annotations are visible on the run page and through the check-run API without log access.
 #
