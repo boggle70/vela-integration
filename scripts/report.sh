@@ -8,10 +8,12 @@
 #   skipped/cancelled → nothing
 # Owners: build (<repo>)     → the "owners" annotation of <repo> in the lock file (space-separated GitHub logins)
 #         resolve, boot-test → REPORT_OWNERS (also used for a repository without an owners annotation)
+#         every failed job   → also REPORT_CC
 #
 # Usage : scripts/report.sh <lock.xml>     (the lock is missing when resolve failed before writing it)
 # Env   : GH_TOKEN, GITHUB_REPOSITORY, GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, GITHUB_SERVER_URL (set by Actions)
 #         REPORT_OWNERS    space-separated GitHub logins for resolve and boot-test
+#         REPORT_CC        space-separated GitHub logins mentioned in every failure report, in addition to the owners
 #         REPORT_OVERRIDE  if set, mention only this login (used outside riscv-vela, e.g. in a fork)
 #         REPORT_SELF      job name of this job, excluded from the report (default: report)
 # Local test (no writes):
@@ -46,14 +48,16 @@ write() {
   fi
 }
 
-# "@a @b" for the given logins, or the override login.
+# "@a @b" for the given logins (each once, in order), or the override login.
 mentions() {
   if [ -n "${REPORT_OVERRIDE:-}" ]; then
     echo "@$REPORT_OVERRIDE"
   else
     local out='' login
     # shellcheck disable=SC2048 # split the space-separated logins
-    for login in $*; do out+="@$login "; done
+    for login in $*; do
+      case " $out" in *" @$login "*) ;; *) out+="@$login " ;; esac
+    done
     echo "${out% }"
   fi
 }
@@ -122,6 +126,7 @@ while IFS=$'\t' read -r name conclusion check_url; do
     "build ("*")") c=${name#build (}; owners=$(owners_of "${c%)}") ;;
   esac
   [ -n "$owners" ] || owners=${REPORT_OWNERS:-}
+  owners="$owners ${REPORT_CC:-}"
   title="integration: $name failed"
   num=$(awk -F'\t' -v t="$title" '$2 == t { print $1; exit }' "$tmp/issues")
 

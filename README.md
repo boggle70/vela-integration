@@ -68,6 +68,8 @@ so they get a GitHub notification (by email if they enabled it):
 | `build (<repo>)` | the `owners` annotation of the repository in `default.xml` |
 | `resolve`, `boot-test` | `REPORT_OWNERS` in `integration.yml` |
 
+`REPORT_CC` in `integration.yml` (the CI owners) is also mentioned in every failure report.
+
 The issue is titled `integration: <job> failed` and carries the lock and the end of the failed step's log.
 If the issue is already open, a later failure adds a comment; when the job passes again, the issue is closed.
 Outside riscv-vela (e.g. in a fork) only the user who started the run is mentioned, and nothing is reported if the
