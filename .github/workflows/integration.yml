@@ -6,7 +6,8 @@
 #               if the key already exists, the component is not built.
 #   boot-test : restore the four outputs from the cache, boot, and check that a login prompt appears on serial.
 #   report    : open an issue for each failed job that mentions its owners (scripts/report.sh), and close it when the
-#               job passes again. build (<repo>) → the owners annotation in default.xml; resolve, boot-test → REPORT_OWNERS.
+#               job passes again. build (<repo>) → the owners annotation in default.xml; resolve, boot-test → REPORT_OWNERS;
+#               every failed job → also REPORT_CC.
 #
 # Outputs are passed through the cache, not artifacts. The images are hundreds of MB or more, and the documentation
 #   does not make clear how the artifact storage limit applies to public repositories. The cache allows 10 GB per repository.
@@ -210,6 +211,8 @@ jobs:
       issues: write   # open, comment on and close the report issues
     env:
       REPORT_OWNERS: Park-Jin-Ho boggle70
+      # CI owners, mentioned in every failure report
+      REPORT_CC: Park-Jin-Ho boggle70
       # Outside riscv-vela (e.g. a fork), mention only the user who started the run.
       REPORT_OVERRIDE: ${{ github.repository != 'riscv-vela/vela-integration' && github.actor || '' }}
     steps:
