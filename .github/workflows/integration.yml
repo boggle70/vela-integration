@@ -5,6 +5,8 @@
 #   build     : build each component (matrix). Outputs are stored under the cache key <component>-<SHA>-<script hash>;
 #               if the key already exists, the component is not built.
 #   boot-test : restore the four outputs from the cache, boot, and check that a login prompt appears on serial.
+#   report    : open an issue for each failed job that mentions its owners (scripts/report.sh), and close it when the
+#               job passes again. build (<repo>) → the owners annotation in default.xml; resolve, boot-test → REPORT_OWNERS.
 #
 # Outputs are passed through the cache, not artifacts. The images are hundreds of MB or more, and the documentation
 #   does not make clear how the artifact storage limit applies to public repositories. The cache allows 10 GB per repository.
@@ -195,3 +197,31 @@ jobs:
         with:
           path: lock.xml
           key: ${{ needs.resolve.outputs.ok-key }}
+
+  # Runs after the others whatever their result, unless resolve found the same lock already passed.
+  report:
+    needs: [resolve, build, boot-test]
+    if: always() && (needs.resolve.result == 'failure' || needs.resolve.outputs.run == 'true')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read   # jobs of this run
+      checks: read    # error annotations of the failed jobs
+      issues: write   # open, comment on and close the report issues
+    env:
+      REPORT_OWNERS: Park-Jin-Ho boggle70
+      # Outside riscv-vela (e.g. a fork), mention only the user who started the run.
+      REPORT_OVERRIDE: ${{ github.repository != 'riscv-vela/vela-integration' && github.actor || '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Missing when resolve failed before uploading it
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: lock
+
+      - name: Report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/report.sh lock.xml
