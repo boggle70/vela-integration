@@ -12,3 +12,5 @@ scripts/fetch.sh
 scripts/report.sh
 scripts/resolve.sh
 scripts/run-logged.sh
+.githooks/pre-commit
+docs/spdx.md

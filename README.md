@@ -51,6 +51,11 @@ scripts/report.sh           report failed jobs as issues that mention the owners
 components/<repo>.sh        deps: apt package list / build <src> <out>: build
 compose/boot-test.sh        boot test
 .github/workflows/integration.yml
+.githooks/pre-commit        commit-time SPDX check (docs/spdx.md)
+.reuse/targets.txt          files that carry SPDX tags
+.reuse/check-mode           SPDX check mode: off / warn / enforce
+LICENSES/                   license texts referenced by the SPDX tags
+docs/spdx.md                SPDX tags: reference adoption guide
 ```
 
 If a repository provides `ci/integration-build.sh`, `components/<repo>.sh build` runs that script with `<out>` as its argument.
@@ -101,6 +106,18 @@ compose/boot-test.sh out
 ```
 
 To fetch the tree with the repo tool: `repo init -u <this repository URL> -m default.xml && repo sync`
+
+## SPDX tags
+
+Each file carries its license and copyright as SPDX tags. Before committing, enable the check once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+The hook checks the staged files listed in `.reuse/targets.txt` with `reuse lint-file` (`pipx install reuse`).
+The mode in `.reuse/check-mode` is `warn`: problems are reported and the commit goes ahead.
+See [docs/spdx.md](docs/spdx.md) for the rules and for adopting the same scheme in another repository.
 
 ## Known risks
 

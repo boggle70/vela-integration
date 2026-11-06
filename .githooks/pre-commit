@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
+# pre-commit — check the SPDX tags of the staged files listed in .reuse/targets.txt.
+#
+# Enable once per clone: git config core.hooksPath .githooks
+# Mode (.reuse/check-mode): off = no check, warn = report only (default), enforce = abort the commit.
+# Any other value counts as enforce. The mode, the list and the files are all read as staged, not from the
+# working tree. Skip one commit with: git commit --no-verify
+# See docs/spdx.md.
+set -euo pipefail
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+# in_index <path>: the path is in the index.  staged <path>: its staged content, without CR.
+in_index() { git cat-file -e ":$1" 2> /dev/null; }
+staged() { git cat-file blob ":$1" | tr -d '\r'; }
+
+mode=warn
+if in_index .reuse/check-mode; then
+	mode=$(staged .reuse/check-mode | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+fi
+case $mode in
+off) exit 0 ;;
+warn | enforce) ;;
+*)
+	echo "spdx: unknown mode '$mode' in .reuse/check-mode (off, warn, enforce); using enforce" >&2
+	mode=enforce
+	;;
+esac
+
+# Report a problem, then abort (enforce) or go ahead (warn).
+fail() {
+	echo "spdx: $*" >&2
+	if [ "$mode" = enforce ]; then
+		echo "spdx: commit aborted (mode enforce). Skip once with: git commit --no-verify" >&2
+		exit 1
+	fi
+	echo "spdx: commit goes ahead (mode warn)" >&2
+	exit 0
+}
+
+in_index .reuse/targets.txt || fail "no .reuse/targets.txt"
+list=$'\n'$(staged .reuse/targets.txt)$'\n'
+listed() { [[ $list == *$'\n'"$1"$'\n'* ]]; } # in-process lookup: no process per path
+
+if git rev-parse --verify -q HEAD > /dev/null; then
+	against=HEAD
+else
+	against=$(git hash-object -t tree /dev/null) # first commit: compare with the empty tree
+fi
+
+check=()    # files to lint
+unlisted=() # files added in this commit but not listed
+stale=()    # listed files deleted or renamed in this commit
+while IFS= read -r -d '' status && IFS= read -r -d '' path; do
+	old=
+	case $status in R*) old=$path && IFS= read -r -d '' path ;; esac
+	if [ "$status" = D ]; then
+		if listed "$path"; then stale+=("$path"); fi
+		continue
+	fi
+	if listed "$path"; then
+		check+=("$path")
+	elif [ -n "$old" ] && listed "$old"; then
+		check+=("$path") # a listed file keeps its check under the new name
+	elif [ "$status" != M ]; then
+		case $path in
+		LICENSES/* | .reuse/* | .githooks/pre-commit) ;; # license texts and the check's own files
+		*) unlisted+=("$path") ;;
+		esac
+	fi
+	if [ -n "$old" ] && listed "$old" && ! listed "$path"; then stale+=("$old"); fi
+done < <(git diff --cached --name-status -z -M --diff-filter=ACMRD "$against")
+
+if [ ${#unlisted[@]} -gt 0 ]; then
+	echo "spdx: new files not in .reuse/targets.txt (add them if they need tags):" >&2
+	printf '  %s\n' "${unlisted[@]}" >&2
+fi
+if [ ${#stale[@]} -gt 0 ]; then
+	echo "spdx: files deleted or renamed but still in .reuse/targets.txt (update the list):" >&2
+	printf '  %s\n' "${stale[@]}" >&2
+fi
+[ ${#check[@]} -gt 0 ] || exit 0
+
+command -v reuse > /dev/null || fail "reuse is not installed (pipx install reuse)"
+
+# Lint a copy of the index, so that only the staged content is checked.
+sidecars=()
+for f in "${check[@]}"; do sidecars+=("$f.license"); done
+{
+	printf '%s\0' "${check[@]}"
+	# Files reuse also reads: license texts, REUSE.toml, .license sidecar files.
+	git --literal-pathspecs ls-files -z -- LICENSES REUSE.toml .reuse/dep5 "${sidecars[@]}"
+} | git checkout-index -z --stdin --prefix="$tmp/tree/"
+
+if ! out=$(cd "$tmp/tree" && reuse --root "$tmp/tree" lint-file -- "${check[@]}" 2>&1); then
+	fail "reuse lint-file reported problems:
+${out//$tmp\/tree\//}"
+fi
