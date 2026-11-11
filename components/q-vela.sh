@@ -8,20 +8,22 @@ source "$(dirname "$0")/lib.sh"
 
 deps() {
   echo git build-essential ninja-build pkg-config libglib2.0-dev libpixman-1-dev libslirp-dev \
-    python3 python3-venv flex bison
+    python3 python3-venv flex bison libcap-ng-dev libattr1-dev
 }
 
 build() {
   local src=$1 out=$2
   cd "$src/qemu" || exit
   # --enable-slirp is required for -netdev user in Launch (README)
-  ./configure --target-list=riscv64-softmmu --enable-slirp --prefix="$out"
+  # --enable-virtfs is required for the 9p share in compose/tee-test.sh (needs libcap-ng-dev, libattr1-dev)
+  ./configure --target-list=riscv64-softmmu --enable-slirp --enable-virtfs --prefix="$out"
   make -j"$JOBS"
   make install
 
   "$out/bin/qemu-system-riscv64" --version
   "$out/bin/qemu-system-riscv64" -device help | grep -q gemmini || die "gemmini device missing"
   "$out/bin/qemu-system-riscv64" -netdev help | grep -qx user || die "slirp (user netdev) missing"
+  "$out/bin/qemu-system-riscv64" -device help | grep -q virtio-9p || die "virtfs (virtio-9p) missing"
 }
 
 main "$@"

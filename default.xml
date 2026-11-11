@@ -15,6 +15,7 @@
 
   Stage 1 scope: the boot configuration in the "Launch" section of the q-vela README
     q-vela (QEMU) + vela-fws (fw_dynamic.bin) + vela-linux (Image) + vela (Ubuntu image)
+  TEE test: vela-apps (hello.vela) run in the booted guest with keystone-driver.ko (compose/tee-test.sh)
 
   annotation owners: GitHub logins (space-separated) mentioned in the issue scripts/report.sh opens when the
   repository's build fails. resolve and boot-test failures go to REPORT_OWNERS in integration.yml.
@@ -34,5 +35,8 @@
   </project>
   <project name="vela"       path="vela"       revision="62d4922671476e1eca39af9ffcadceae4cde3132" upstream="ubuntu">
     <annotation name="owners" value="syahn0910" />
+  </project>
+  <project name="vela-apps"  path="vela-apps"  revision="d5a6d748184adcbd02246cc9a967a58a5a26cbda" upstream="main">
+    <annotation name="owners" value="kanghayoung-76" />
   </project>
 </manifest>

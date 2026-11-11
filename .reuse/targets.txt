@@ -14,3 +14,5 @@ scripts/resolve.sh
 scripts/run-logged.sh
 .githooks/pre-commit
 docs/spdx.md
+components/vela-apps.sh
+compose/tee-test.sh
