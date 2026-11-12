@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2026 FALINUX Co., Ltd.
 
 # vela-integration
 
-Builds the riscv-vela repositories together and checks that the combined stack boots.
+Builds the riscv-vela repositories together, checks that the combined stack boots, and runs a Keystone enclave in it.
 It is separate from each repository's PR CI and is not a required PR check.
 
 ## Principles
@@ -21,22 +21,36 @@ It is separate from each repository's PR CI and is not a required PR check.
 
 ## Stage 1 scope
 
-The boot configuration in the "Launch" section of the [q-vela README](https://github.com/riscv-vela/q-vela#launch):
+The boot configuration in the "Launch" section of the [q-vela README](https://github.com/riscv-vela/q-vela#launch),
+plus a TEE test that runs a vela-apps enclave package in the booted guest:
 
 | Repository | Output | Build procedure source |
 |---|---|---|
-| q-vela | `qemu-system-riscv64` | q-vela README "Build QEMU" |
+| q-vela | `qemu-system-riscv64` | q-vela README "Build QEMU", plus `--enable-virtfs` (see below) |
 | vela-fws | `fw_dynamic.bin` (OpenSBI with the Security Monitor) | vela-fws README "TEE — Building OpenSBI + Security Monitor" |
 | vela-linux | `Image`, `keystone-driver.ko` | vela-linux README "Building" |
 | vela | `ubuntu-noble-riscv64.qcow2` | vela README, `init.sh` |
+| vela-apps | `hello.vela` (Keystone enclave package) | vela-apps README "TEE — Building the Keystone Applications" |
 
-Pass criterion: booting with the four outputs above prints the getty prompt `<hostname> login:` on the serial console.
+Pass criteria (a run passes, and its success record is saved, only when both tests pass):
+
+| Test | Script | Passes when |
+|---|---|---|
+| `boot-test` | `compose/boot-test.sh` | booting with the q-vela, vela-fws, vela-linux and vela outputs prints the getty prompt `<hostname> login:` on the serial console |
+| `tee-test` | `compose/tee-test.sh` | after a second boot, `keystone-driver.ko` loads (`/dev/keystone_enclave` appears) and `hello.vela` exits 0 and prints `[HOST] Terminating host...` |
+
+Differences from the repositories' READMEs in the TEE test
+
+- q-vela is configured with `--enable-virtfs`, which the q-vela README does not use. The TEE test passes `keystone-driver.ko`
+  and `hello.vela` to the guest through a virtio-9p share. The same QEMU binary is used by the boot test.
+- The guest runs with `-smp 1` (`QEMU_SMP`), not `-smp 4` as in the q-vela "Launch" command. With `-smp 4` the hart that enters
+  the enclave stalls (vela-fws Security Monitor issue).
 
 Excluded from stage 1
 
 | Target | Reason |
 |---|---|
-| vela-apps | The sdk C++ code fails to build with GCC 13 (`uintptr_t` error) |
+| vela-apps attestation example | `FW_BIN` is not set, so the vela-apps build skips it. Only `hello` is tested |
 | vela-fws edk2, buildroot | RAS boot path (q-vela `docs/ras.md`). Stage 2 |
 | vela-ros, t-vela, f-vela, etc. | Not part of the boot configuration |
 
@@ -50,6 +64,7 @@ scripts/cache-key.sh        output cache key: <repo>-<SHA>-<build script hash>
 scripts/report.sh           report failed jobs as issues that mention the owners
 components/<repo>.sh        deps: apt package list / build <src> <out>: build
 compose/boot-test.sh        boot test
+compose/tee-test.sh         TEE test: load keystone-driver.ko and run hello.vela in the booted guest
 .github/workflows/integration.yml
 .githooks/pre-commit        commit-time SPDX check (docs/spdx.md)
 .reuse/targets.txt          files that carry SPDX tags
@@ -76,7 +91,7 @@ so they get a GitHub notification (by email if they enabled it):
 | Failed job | Mentioned |
 |---|---|
 | `build (<repo>)` | the `owners` annotation of the repository in `default.xml` |
-| `resolve`, `boot-test` | `REPORT_OWNERS` in `integration.yml` |
+| `resolve`, `boot-test`, `tee-test` | `REPORT_OWNERS` in `integration.yml` |
 
 `REPORT_CC` in `integration.yml` (the CI owners) is also mentioned in every failure report.
 
@@ -91,18 +106,19 @@ repository has issues disabled.
    `git ls-remote https://github.com/riscv-vela/<repo> refs/heads/<upstream>`
 2. Put the new SHA in the project's `revision` in `default.xml` on a branch (in a fork, on the fork's branch).
 3. Run the integration build on that branch: `gh workflow run integration --ref <branch>` (in a fork, the run uses the fork's Actions).
-4. Open a pull request with the run link; merge it when the build and boot test pass.
+4. Open a pull request with the run link; merge it when the build, boot test and TEE test pass.
 
 Locally (Ubuntu 24.04 x64, sudo required):
 
 ```sh
 scripts/resolve.sh default.xml lock.xml
-for c in q-vela vela-fws vela-linux vela; do
+for c in q-vela vela-fws vela-linux vela vela-apps; do
   sudo apt-get install -y $(components/$c.sh deps)
   scripts/fetch.sh lock.xml $c src/$c
   components/$c.sh build src/$c out/$c
 done
 compose/boot-test.sh out
+compose/tee-test.sh out
 ```
 
 To fetch the tree with the repo tool: `repo init -u <this repository URL> -m default.xml && repo sync`
