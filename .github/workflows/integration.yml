@@ -7,6 +7,8 @@
 #   build     : build each component (matrix). Outputs are stored under the cache key <component>-<SHA>-<script hash>;
 #               if the key already exists, the component is not built.
 #   boot-test : restore the four outputs from the cache, boot, and check that a login prompt appears on serial.
+#   tee-test  : after boot-test, boot again and run vela-apps hello.vela with keystone-driver.ko in the guest.
+#               The success record is saved here, so a run passes only when both tests pass.
 #   report    : open an issue for each failed job that mentions its owners (scripts/report.sh), and close it when the
 #               job passes again. build (<repo>) → the owners annotation in default.xml; resolve, boot-test → REPORT_OWNERS;
 #               every failed job → also REPORT_CC.
@@ -92,7 +94,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [q-vela, vela-fws, vela-linux, vela]
+        component: [q-vela, vela-fws, vela-linux, vela, vela-apps]
     env:
       C: ${{ matrix.component }}
     steps:
@@ -195,6 +197,78 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  tee-test:
+    needs: [resolve, build, boot-test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: lock
+
+      - id: key
+        run: |
+          for c in q-vela vela-fws vela-linux vela vela-apps; do
+            echo "$c=$(scripts/cache-key.sh lock.xml "$c")"
+          done >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/q-vela
+          key: ${{ steps.key.outputs.q-vela }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/vela-fws
+          key: ${{ steps.key.outputs.vela-fws }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/vela-linux
+          key: ${{ steps.key.outputs.vela-linux }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/vela
+          key: ${{ steps.key.outputs.vela }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: out/vela-apps
+          key: ${{ steps.key.outputs.vela-apps }}
+          fail-on-cache-miss: true
+
+      - name: QEMU runtime libraries
+        run: |
+          sudo apt-get update
+          # shellcheck disable=SC2046 # split the space-separated list into arguments
+          sudo apt-get install -y --no-install-recommends $(components/q-vela.sh deps)
+
+      - name: TEE test
+        run: |
+          scripts/run-logged.sh tee-test tee-test.log compose/tee-test.sh out
+          tail -n 1 tee-test.log >> "$GITHUB_STEP_SUMMARY"
+
+      - name: TEE log summary
+        if: always()
+        run: |
+          [ -f out/tee.log ] || exit 0
+          msg=$(tr -d '\r' < out/tee.log | sed 's/\x1b\[[0-9;?]*[A-Za-z]//g' | tail -n 40 \
+            | sed -e 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::notice title=tee.log last 40 lines (of $(wc -l < out/tee.log))::$msg"
+
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: tee-log
+          path: |
+            out/tee.log
+            out/tee-qemu.log
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Record success
         uses: actions/cache/save@v6
         with:
@@ -203,7 +277,7 @@ jobs:
 
   # Runs after the others whatever their result, unless resolve found the same lock already passed.
   report:
-    needs: [resolve, build, boot-test]
+    needs: [resolve, build, boot-test, tee-test]
     if: always() && (needs.resolve.result == 'failure' || needs.resolve.outputs.run == 'true')
     runs-on: ubuntu-24.04
     permissions:
